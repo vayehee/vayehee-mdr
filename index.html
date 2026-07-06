@@ -2,7 +2,7 @@
 <html>
 <head>
     <base target="_top">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -131,7 +131,9 @@
 
         .chart-wrap {
             width: 100%;
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
         }
 
         svg {
@@ -309,6 +311,56 @@
             font-size: 13px;
             white-space: nowrap;
         }
+
+        @media (max-width: 700px) {
+            main {
+                padding: 12px;
+            }
+
+            .chart-panel {
+                padding: 14px 12px 8px;
+            }
+
+            .chart-head {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            .legend {
+                gap: 10px 14px;
+                font-size: 12px;
+            }
+
+            .chart-wrap {
+                padding-bottom: 4px;
+            }
+
+            #articleViewsChart svg,
+            #wealthHealthChart svg {
+                min-width: 940px;
+            }
+
+            #articleTrafficSankey svg {
+                min-width: 1040px;
+            }
+
+            .axis text {
+                font-size: 13px;
+            }
+
+            .sankey-node-label {
+                font-size: 14px;
+            }
+
+            .wealth-bubble-label {
+                font-size: 12px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -475,6 +527,18 @@
             document.getElementById('dashboard').classList.remove('is-hidden');
         }
 
+        function isMobileDashboard() {
+            return window.matchMedia && window.matchMedia('(max-width: 700px)').matches;
+        }
+
+        function chartOuterWidth(container, desktopMin, mobileMin) {
+            const node = container && container.node ? container.node() : null;
+            const clientWidth = node ? node.clientWidth || 0 : 0;
+            const minWidth = isMobileDashboard() ? mobileMin : desktopMin;
+
+            return Math.max(minWidth, clientWidth || desktopMin);
+        }
+
         function renderArticleViewsChart(rawData, rawNewsData) {
             const status = document.getElementById('status');
             const container = d3.select('#articleViewsChart');
@@ -522,10 +586,13 @@
             status.textContent = formatDate(data[0].date) + ' - ' + formatDate(data[data.length - 1].date);
             container.selectAll('*').remove();
 
-            const outerWidth = Math.max(760, container.node().clientWidth || 980);
-            const focusHeight = 430;
-            const contextHeight = 72;
-            const margin = { top: 18, right: 68, bottom: 116, left: 64 };
+            const mobile = isMobileDashboard();
+            const outerWidth = chartOuterWidth(container, 760, 940);
+            const focusHeight = mobile ? 500 : 430;
+            const contextHeight = mobile ? 86 : 72;
+            const margin = mobile
+                ? { top: 20, right: 78, bottom: 126, left: 74 }
+                : { top: 18, right: 68, bottom: 116, left: 64 };
             const contextMarginTop = focusHeight + 38;
             const width = outerWidth - margin.left - margin.right;
             const height = focusHeight - margin.top - margin.bottom;
@@ -885,10 +952,13 @@
 
             status.text('Loading bubbles...');
 
-            const outerWidth = Math.max(760, container.node().clientWidth || 980);
-            const focusHeight = 500;
-            const contextHeight = 72;
-            const margin = { top: 18, right: 28, bottom: 58, left: 96 };
+            const mobile = isMobileDashboard();
+            const outerWidth = chartOuterWidth(container, 760, 940);
+            const focusHeight = mobile ? 570 : 500;
+            const contextHeight = mobile ? 86 : 72;
+            const margin = mobile
+                ? { top: 20, right: 34, bottom: 72, left: 112 }
+                : { top: 18, right: 28, bottom: 58, left: 96 };
             const contextMarginTop = focusHeight + 34;
             const width = outerWidth - margin.left - margin.right;
             const innerHeight = focusHeight - margin.top - margin.bottom;
@@ -1393,9 +1463,12 @@
             const container = d3.select('#articleTrafficSankey');
             const status = d3.select('#articleTrafficStatus');
             const centerName = 'Melissa DeRosa';
-            const outerWidth = Math.max(760, container.node().clientWidth || 980);
-            const height = 520;
-            const margin = { top: 12, right: 22, bottom: 18, left: 22 };
+            const mobile = isMobileDashboard();
+            const outerWidth = chartOuterWidth(container, 760, 1040);
+            const height = mobile ? 620 : 520;
+            const margin = mobile
+                ? { top: 16, right: 34, bottom: 24, left: 34 }
+                : { top: 12, right: 22, bottom: 18, left: 22 };
             const width = outerWidth - margin.left - margin.right;
             const graph = buildArticleTrafficSankeyGraph(rows, month, centerName);
 
