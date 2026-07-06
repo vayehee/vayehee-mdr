@@ -401,7 +401,7 @@
             const timer = setInterval(function() {
                 if (window.DASHBOARD_AUTH_ERROR) {
                     clearInterval(timer);
-                    landingInfo.textContent = 'Unauthorized access!';
+                    landingInfo.textContent = 'Unauthorized access! ' + window.DASHBOARD_AUTH_ERROR;
                     return;
                 }
 
