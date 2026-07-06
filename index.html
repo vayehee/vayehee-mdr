@@ -6,7 +6,6 @@
     <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
-    <script defer src="https://script.google.com/macros/s/AKfycbx0GHP20_uwccRo5lT_K06Qg6OU8wSfz6g6R-hv1nnjLIH48wF3ThOcWvgFdbSHV6C_/exec?view=dashboard_data"></script>
     <style>
         :root {
             color-scheme: light;
@@ -347,11 +346,22 @@
 
         function bootDashboard() {
             const status = document.getElementById('status');
-            initTelegramWebApp();
+            const webApp = initTelegramWebApp();
+
+            if (!loadDashboardData(webApp)) {
+                return;
+            }
+
             status.textContent = 'Loading D3...';
 
             const startedAt = Date.now();
             const timer = setInterval(function() {
+                if (window.DASHBOARD_AUTH_ERROR) {
+                    clearInterval(timer);
+                    status.textContent = window.DASHBOARD_AUTH_ERROR;
+                    return;
+                }
+
                 if (window.d3 && window.d3.sankey && window.ARTICLE_VIEWS_DATA_READY) {
                     clearInterval(timer);
                     status.textContent = 'Rendering chart...';
@@ -384,11 +394,35 @@
             const webApp = window.Telegram && window.Telegram.WebApp;
 
             if (!webApp) {
-                return;
+                return null;
             }
 
             webApp.ready();
             webApp.expand();
+
+            return webApp;
+        }
+
+        function loadDashboardData(webApp) {
+            const status = document.getElementById('status');
+
+            if (!webApp || !webApp.initData) {
+                status.textContent = 'Open this dashboard from the Telegram group.';
+                return false;
+            }
+
+            const script = document.createElement('script');
+            script.defer = true;
+            script.src = 'https://script.google.com/macros/s/AKfycbx0GHP20_uwccRo5lT_K06Qg6OU8wSfz6g6R-hv1nnjLIH48wF3ThOcWvgFdbSHV6C_/exec?view=dashboard_data&tg_init_data=' +
+                encodeURIComponent(webApp.initData) +
+                '&now=' +
+                Date.now();
+            script.onerror = function() {
+                status.textContent = 'Dashboard data could not be loaded.';
+            };
+
+            document.head.appendChild(script);
+            return true;
         }
 
         function renderArticleViewsChart(rawData, rawNewsData) {
