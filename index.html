@@ -1,0 +1,1583 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+    <script defer src="https://script.google.com/macros/s/AKfycbx0GHP20_uwccRo5lT_K06Qg6OU8wSfz6g6R-hv1nnjLIH48wF3ThOcWvgFdbSHV6C_/exec?view=dashboard_data"></script>
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: Arial, sans-serif;
+            --text: #2f3437;
+            --muted: #6f7578;
+            --grid: #e6e8eb;
+            --views: #2aa84a;
+            --machine: #f29900;
+            --trends: #4285f4;
+            --news: #d93025;
+        }
+
+        body {
+            margin: 0;
+            background: #f6f7f8;
+            color: var(--text);
+        }
+
+        main {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .chart-panel {
+            background: #fff;
+            border: 1px solid #dde1e5;
+            border-radius: 8px;
+            padding: 18px 18px 10px;
+        }
+
+        .chart-panel + .chart-panel {
+            margin-top: 18px;
+        }
+
+        .chart-head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 8px;
+        }
+
+        .chart-head select {
+            min-width: 122px;
+            border: 1px solid #c8cdd2;
+            border-radius: 6px;
+            background: #fff;
+            color: var(--text);
+            font-size: 13px;
+            padding: 6px 9px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: 0;
+        }
+
+        .status {
+            color: var(--muted);
+            font-size: 13px;
+            min-height: 18px;
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin: 8px 0 6px;
+            font-size: 13px;
+        }
+
+        .legend span {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .swatch {
+            width: 11px;
+            height: 11px;
+            border-radius: 2px;
+            display: inline-block;
+        }
+
+        .chart-wrap {
+            width: 100%;
+            overflow: hidden;
+        }
+
+        svg {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .axis text {
+            fill: #4b5155;
+            font-size: 12px;
+        }
+
+        .axis path,
+        .axis line {
+            stroke: #9aa0a6;
+        }
+
+        .grid line {
+            stroke: var(--grid);
+        }
+
+        .grid path {
+            display: none;
+        }
+
+        .brush .selection {
+            fill: #73808c;
+            fill-opacity: 0.22;
+            stroke: #73808c;
+        }
+
+        .tooltip {
+            position: fixed;
+            pointer-events: none;
+            opacity: 0;
+            background: rgba(34, 39, 43, 0.94);
+            color: #fff;
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-size: 12px;
+            line-height: 1.45;
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18);
+            z-index: 10;
+        }
+
+        .news-modal {
+            position: fixed;
+            display: none;
+            min-width: 250px;
+            max-width: min(360px, calc(100vw - 32px));
+            background: #fff;
+            border: 1px solid #d4d9de;
+            border-radius: 8px;
+            box-shadow: 0 14px 34px rgba(0, 0, 0, 0.2);
+            padding: 12px;
+            z-index: 20;
+        }
+
+        .news-modal.is-open {
+            display: block;
+        }
+
+        .news-modal button {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 26px;
+            height: 26px;
+            border: 0;
+            background: transparent;
+            color: #6f7578;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        .news-modal .publisher {
+            margin: 0 28px 7px 0;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--muted);
+        }
+
+        .news-modal a {
+            color: #1558d6;
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1.35;
+            text-decoration: none;
+        }
+
+        .news-modal a:hover {
+            text-decoration: underline;
+        }
+
+        .sankey-link {
+            mix-blend-mode: multiply;
+        }
+
+        .sankey-node {
+            cursor: default;
+        }
+
+        .sankey-node-group.is-linked .sankey-node,
+        .sankey-node-group.is-linked .sankey-node-label {
+            cursor: pointer;
+        }
+
+        .sankey-node-label {
+            font-size: 13px;
+            fill: #30363a;
+            paint-order: stroke;
+            stroke: #fff;
+            stroke-width: 3px;
+            stroke-linejoin: round;
+            pointer-events: auto;
+        }
+
+        .sankey-node-group.is-linked .sankey-node-label {
+            fill: #1558d6;
+            text-decoration: underline;
+        }
+
+        .wealth-bubble {
+            stroke: rgba(47, 52, 55, 0.3);
+            stroke-width: 1;
+        }
+
+        .wealth-bubble-label {
+            font-size: 11px;
+            font-weight: 600;
+            fill: #30363a;
+            text-anchor: middle;
+            pointer-events: none;
+            paint-order: stroke;
+            stroke: rgba(255, 255, 255, 0.92);
+            stroke-width: 3px;
+            stroke-linejoin: round;
+        }
+
+        .wealth-bubble-label.is-linked {
+            cursor: pointer;
+            pointer-events: auto;
+            text-decoration: underline;
+        }
+
+        .timeline-jump line {
+            stroke: #c8cdd2;
+            stroke-width: 1;
+            stroke-dasharray: 2 4;
+        }
+
+        .timeline-jump text {
+            fill: #a4abb1;
+            font-size: 18px;
+            font-weight: 600;
+            text-anchor: middle;
+        }
+
+        .timeline-controls {
+            display: grid;
+            grid-template-columns: minmax(180px, 1fr) auto;
+            align-items: center;
+            gap: 12px;
+            margin: 8px 0 4px;
+        }
+
+        .timeline-controls input[type="range"] {
+            width: 100%;
+        }
+
+        .timeline-window {
+            color: var(--muted);
+            font-size: 13px;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <section class="chart-panel">
+            <div class="chart-head">
+                <h1>Melissa DeRosa Interest Pulse</h1>
+                <div class="status" id="status">Loading chart...</div>
+            </div>
+            <div class="legend">
+                <span><i class="swatch" style="background: var(--views);"></i>Wikipedia Article Views</span>
+                <span><i class="swatch" style="background: var(--machine);"></i>Machine Access</span>
+                <span><i class="swatch" style="background: var(--trends);"></i>Google Trends</span>
+                <span><i class="swatch" style="background: var(--news); border-radius: 50%;"></i>Google News</span>
+            </div>
+            <div class="chart-wrap" id="articleViewsChart"></div>
+        </section>
+        <section class="chart-panel">
+            <div class="chart-head">
+                <h1>Wikipedia Traffic Flow</h1>
+                <select id="articleTrafficMonthSelect" aria-label="Select traffic month"></select>
+            </div>
+            <div class="legend">
+                <span><i class="swatch" style="background: #9ecbff;"></i>Search Engines</span>
+                <span><i class="swatch" style="background: #d8c7ff;"></i>Other Wikimedia</span>
+                <span><i class="swatch" style="background: #ffe8a3;"></i>Websites</span>
+                <span><i class="swatch" style="background: #d93025;"></i>Negative</span>
+                <span><i class="swatch" style="background: #d9dde2;"></i>Neutral</span>
+                <span><i class="swatch" style="background: #188038;"></i>Positive</span>
+            </div>
+            <div class="status" id="articleTrafficStatus">Loading traffic...</div>
+            <div class="chart-wrap" id="articleTrafficSankey"></div>
+        </section>
+        <section class="chart-panel">
+            <div class="chart-head">
+                <h1>Wikipedia Editorial Patterns</h1>
+                <div class="status" id="wealthHealthStatus">Loading bubbles...</div>
+            </div>
+            <div class="legend">
+                <span><i class="swatch" style="background: rgb(217, 48, 37);"></i>Adversarial</span>
+                <span><i class="swatch" style="background: rgba(217, 48, 37, 0.58);"></i>Foe</span>
+                <span><i class="swatch" style="background: #fff2a8;"></i>Neutral</span>
+                <span><i class="swatch" style="background: rgba(24, 128, 56, 0.58);"></i>Friend</span>
+                <span><i class="swatch" style="background: rgb(24, 128, 56);"></i>Trusted</span>
+                <span><i class="swatch" style="background: #9ecbff;"></i>Bot/Admin neutral</span>
+            </div>
+            <div class="chart-wrap" id="wealthHealthChart"></div>
+        </section>
+    </main>
+    <div class="tooltip" id="tooltip"></div>
+    <div class="news-modal" id="newsModal" role="dialog" aria-live="polite">
+        <button type="button" id="newsModalClose" aria-label="Close">&times;</button>
+        <p class="publisher" id="newsModalPublisher"></p>
+        <a id="newsModalTitle" href="#" target="_blank" rel="noopener"></a>
+    </div>
+
+    <script>
+        window.addEventListener('error', function(event) {
+            const message = event && event.message
+                ? event.message
+                : 'Dashboard script error.';
+            document.getElementById('status').textContent = message;
+        });
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', bootDashboard);
+        } else {
+            bootDashboard();
+        }
+
+        function bootDashboard() {
+            const status = document.getElementById('status');
+            initTelegramWebApp();
+            status.textContent = 'Loading D3...';
+
+            const startedAt = Date.now();
+            const timer = setInterval(function() {
+                if (window.d3 && window.d3.sankey && window.ARTICLE_VIEWS_DATA_READY) {
+                    clearInterval(timer);
+                    status.textContent = 'Rendering chart...';
+                    renderArticleViewsChart(window.ARTICLE_VIEWS_DATA || [], window.GOOGLE_NEWS_DATA || []);
+                    renderArticleTrafficSankey(window.ARTICLE_TRAFFIC_DATA || { months: [], rows: [] });
+                    renderWealthHealthChart(window.WEALTH_HEALTH_DATA || []);
+                    return;
+                }
+
+                if (Date.now() - startedAt > 8000) {
+                    clearInterval(timer);
+                    if (!window.d3) {
+                        status.textContent = 'D3 library did not load.';
+                        return;
+                    }
+                    if (!window.d3.sankey) {
+                        status.textContent = 'D3 Sankey library did not load.';
+                        return;
+                    }
+                    if (!window.ARTICLE_VIEWS_DATA_READY) {
+                        status.textContent = 'Dashboard data did not load.';
+                        return;
+                    }
+                    status.textContent = 'Dashboard could not start.';
+                }
+            }, 100);
+        }
+
+        function initTelegramWebApp() {
+            const webApp = window.Telegram && window.Telegram.WebApp;
+
+            if (!webApp) {
+                return;
+            }
+
+            webApp.ready();
+            webApp.expand();
+        }
+
+        function renderArticleViewsChart(rawData, rawNewsData) {
+            const status = document.getElementById('status');
+            const container = d3.select('#articleViewsChart');
+            const tooltip = d3.select('#tooltip');
+            const newsModal = d3.select('#newsModal');
+            const newsModalPublisher = d3.select('#newsModalPublisher');
+            const newsModalTitle = d3.select('#newsModalTitle');
+            const parseDate = d3.timeParse('%Y-%m-%d');
+            const formatDate = d3.timeFormat('%b %-d, %Y');
+            const data = (rawData || [])
+                .map(function(d) {
+                    return {
+                        date: parseDate(d.date),
+                        articleViews: Number(d.articleViews) || 0,
+                        machineAccess: Number(d.machineAccess) || 0,
+                        googleTrends: Number(d.googleTrends) || 0
+                    };
+                })
+                .filter(function(d) {
+                    return d.date instanceof Date && !isNaN(d.date.getTime());
+                })
+                .sort(function(a, b) {
+                    return a.date - b.date;
+                });
+            const newsData = (rawNewsData || [])
+                .map(function(d) {
+                    return {
+                        date: parseDate(d.date),
+                        time: String(d.time || ''),
+                        timeScore: Number(d.timeScore) || 10,
+                        publisher: String(d.publisher || ''),
+                        title: String(d.title || ''),
+                        url: String(d.url || '')
+                    };
+                })
+                .filter(function(d) {
+                    return d.date instanceof Date && !isNaN(d.date.getTime());
+                });
+
+            if (data.length === 0) {
+                status.textContent = 'No Article Views data found.';
+                return;
+            }
+
+            status.textContent = formatDate(data[0].date) + ' - ' + formatDate(data[data.length - 1].date);
+            container.selectAll('*').remove();
+
+            const outerWidth = Math.max(760, container.node().clientWidth || 980);
+            const focusHeight = 430;
+            const contextHeight = 72;
+            const margin = { top: 18, right: 68, bottom: 116, left: 64 };
+            const contextMarginTop = focusHeight + 38;
+            const width = outerWidth - margin.left - margin.right;
+            const height = focusHeight - margin.top - margin.bottom;
+            const contextInnerHeight = contextHeight - 20;
+
+            const svg = container.append('svg')
+                .attr('viewBox', '0 0 ' + outerWidth + ' ' + (focusHeight + contextHeight + 12));
+
+            const defs = svg.append('defs');
+            defs.append('clipPath')
+                .attr('id', 'article-views-clip')
+                .append('rect')
+                .attr('width', width)
+                .attr('height', height);
+
+            const viewsGradient = defs.append('linearGradient')
+                .attr('id', 'views-fill')
+                .attr('x1', '0%')
+                .attr('y1', '0%')
+                .attr('x2', '0%')
+                .attr('y2', '100%');
+            viewsGradient.append('stop').attr('offset', '0%').attr('stop-color', '#2aa84a').attr('stop-opacity', 0.24);
+            viewsGradient.append('stop').attr('offset', '100%').attr('stop-color', '#2aa84a').attr('stop-opacity', 0.02);
+
+            const trendsGradient = defs.append('linearGradient')
+                .attr('id', 'trends-fill')
+                .attr('x1', '0%')
+                .attr('y1', '0%')
+                .attr('x2', '0%')
+                .attr('y2', '100%');
+            trendsGradient.append('stop').attr('offset', '0%').attr('stop-color', '#4285f4').attr('stop-opacity', 0.22);
+            trendsGradient.append('stop').attr('offset', '100%').attr('stop-color', '#4285f4').attr('stop-opacity', 0.02);
+
+            const x = d3.scaleTime()
+                .domain(d3.extent(data, function(d) { return d.date; }))
+                .range([0, width]);
+
+            const x2 = x.copy();
+
+            const yLeft = d3.scaleLinear()
+                .domain([0, d3.max(data, function(d) { return Math.max(d.articleViews, d.machineAccess); }) || 1])
+                .nice()
+                .range([height, 0]);
+
+            const yRight = d3.scaleLinear()
+                .domain([0, Math.max(100, d3.max(data, function(d) { return d.googleTrends; }) || 1)])
+                .nice()
+                .range([height, 0]);
+
+            const yContext = d3.scaleLinear()
+                .domain(yLeft.domain())
+                .range([contextInnerHeight, 0]);
+
+            const focus = svg.append('g')
+                .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+            const context = svg.append('g')
+                .attr('transform', 'translate(' + margin.left + ',' + contextMarginTop + ')');
+
+            const grid = focus.append('g')
+                .attr('class', 'grid')
+                .call(d3.axisLeft(yLeft).ticks(5).tickSize(-width).tickFormat(''));
+
+            const xAxis = focus.append('g')
+                .attr('class', 'axis')
+                .attr('transform', 'translate(0,' + height + ')');
+
+            const yLeftAxis = focus.append('g')
+                .attr('class', 'axis');
+
+            const yRightAxis = focus.append('g')
+                .attr('class', 'axis')
+                .attr('transform', 'translate(' + width + ',0)');
+
+            focus.append('text')
+                .attr('x', -height / 2)
+                .attr('y', -46)
+                .attr('transform', 'rotate(-90)')
+                .attr('text-anchor', 'middle')
+                .attr('fill', '#4b5155')
+                .attr('font-size', 12)
+                .text('Article Views / Machine Access');
+
+            focus.append('text')
+                .attr('x', height / 2)
+                .attr('y', -52 - width)
+                .attr('transform', 'rotate(90)')
+                .attr('text-anchor', 'middle')
+                .attr('fill', '#4b5155')
+                .attr('font-size', 12)
+                .text('Google Trends Index');
+
+            const chartBody = focus.append('g')
+                .attr('clip-path', 'url(#article-views-clip)');
+
+            const areaViews = d3.area()
+                .curve(d3.curveMonotoneX)
+                .x(function(d) { return x(d.date); })
+                .y0(height)
+                .y1(function(d) { return yLeft(d.articleViews); });
+
+            const lineViews = d3.line()
+                .curve(d3.curveMonotoneX)
+                .x(function(d) { return x(d.date); })
+                .y(function(d) { return yLeft(d.articleViews); });
+
+            const lineMachine = d3.line()
+                .curve(d3.curveMonotoneX)
+                .x(function(d) { return x(d.date); })
+                .y(function(d) { return yLeft(d.machineAccess); });
+
+            const areaTrends = d3.area()
+                .curve(d3.curveMonotoneX)
+                .x(function(d) { return x(d.date); })
+                .y0(height)
+                .y1(function(d) { return yRight(d.googleTrends); });
+
+            const lineTrends = d3.line()
+                .curve(d3.curveMonotoneX)
+                .x(function(d) { return x(d.date); })
+                .y(function(d) { return yRight(d.googleTrends); });
+
+            const viewsAreaPath = chartBody.append('path')
+                .datum(data)
+                .attr('fill', 'url(#views-fill)');
+
+            const trendsAreaPath = chartBody.append('path')
+                .datum(data)
+                .attr('fill', 'url(#trends-fill)');
+
+            const viewsLinePath = chartBody.append('path')
+                .datum(data)
+                .attr('fill', 'none')
+                .attr('stroke', '#2aa84a')
+                .attr('stroke-width', 2.2);
+
+            const machineLinePath = chartBody.append('path')
+                .datum(data)
+                .attr('fill', 'none')
+                .attr('stroke', '#f29900')
+                .attr('stroke-width', 2);
+
+            const trendsLinePath = chartBody.append('path')
+                .datum(data)
+                .attr('fill', 'none')
+                .attr('stroke', '#4285f4')
+                .attr('stroke-width', 2);
+
+            const newsDots = chartBody.append('g')
+                .attr('class', 'news-dots')
+                .selectAll('circle')
+                .data(newsData)
+                .enter()
+                .append('circle')
+                .attr('r', 5)
+                .attr('fill', '#d93025')
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 1.5)
+                .attr('tabindex', 0)
+                .style('cursor', 'pointer')
+                .on('click', function(event, d) {
+                    event.stopPropagation();
+                    openNewsModal(event, d);
+                })
+                .on('keydown', function(event, d) {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openNewsModal(event, d);
+                    }
+                });
+
+            newsDots.raise();
+
+            const contextArea = d3.area()
+                .curve(d3.curveMonotoneX)
+                .x(function(d) { return x2(d.date); })
+                .y0(contextInnerHeight)
+                .y1(function(d) { return yContext(d.articleViews); });
+
+            context.append('path')
+                .datum(data)
+                .attr('fill', '#2aa84a')
+                .attr('fill-opacity', 0.18)
+                .attr('d', contextArea);
+
+            context.append('g')
+                .attr('class', 'axis')
+                .attr('transform', 'translate(0,' + contextInnerHeight + ')')
+                .call(d3.axisBottom(x2).ticks(Math.min(8, data.length)));
+
+            const brush = d3.brushX()
+                .extent([[0, 0], [width, contextInnerHeight]])
+                .on('brush end', brushed);
+
+            const defaultStart = data.length > 45
+                ? data[data.length - 45].date
+                : data[0].date;
+
+            context.append('g')
+                .attr('class', 'brush')
+                .call(brush)
+                .call(brush.move, [x2(defaultStart), x2(data[data.length - 1].date)]);
+
+            updatePaths();
+
+            function updatePaths() {
+                xAxis.call(d3.axisBottom(x).ticks(d3.timeDay.every(2)).tickFormat(d3.timeFormat('%b %-d')));
+                xAxis.selectAll('text')
+                    .attr('transform', 'rotate(-60)')
+                    .attr('text-anchor', 'end')
+                    .attr('dx', '-0.55em')
+                    .attr('dy', '0.35em');
+                yLeftAxis.call(d3.axisLeft(yLeft).ticks(5));
+                yRightAxis.call(d3.axisRight(yRight).ticks(5));
+                grid.call(d3.axisLeft(yLeft).ticks(5).tickSize(-width).tickFormat(''));
+
+                viewsAreaPath.attr('d', areaViews);
+                trendsAreaPath.attr('d', areaTrends);
+                viewsLinePath.attr('d', lineViews);
+                machineLinePath.attr('d', lineMachine);
+                trendsLinePath.attr('d', lineTrends);
+                newsDots
+                    .attr('cx', function(d) { return x(d.date); })
+                    .attr('cy', function(d) { return yRight(d.timeScore); })
+                    .attr('opacity', function(d) {
+                        const domain = x.domain();
+                        return d.date >= domain[0] && d.date <= domain[1] ? 0.88 : 0;
+                    })
+                    .attr('pointer-events', function(d) {
+                        const domain = x.domain();
+                        return d.date >= domain[0] && d.date <= domain[1] ? 'auto' : 'none';
+                    });
+            }
+
+            function brushed(event) {
+                const selection = event.selection;
+
+                if (!selection) {
+                    return;
+                }
+
+                x.domain(selection.map(x2.invert, x2));
+                updatePaths();
+            }
+
+            function openNewsModal(event, d) {
+                const title = d.title || 'Google News item';
+                const publisher = d.publisher || 'Google News';
+                const url = d.url || '#';
+                const maxX = Math.max(16, window.innerWidth - 380);
+                const maxY = Math.max(16, window.innerHeight - 160);
+                const xPos = Math.min(maxX, Math.max(16, event.clientX + 14));
+                const yPos = Math.min(maxY, Math.max(16, event.clientY + 14));
+
+                tooltip.style('opacity', 0);
+                newsModalPublisher.text(publisher + (d.time ? ' | ' + d.time : ''));
+                newsModalTitle
+                    .text(title)
+                    .attr('href', url);
+                newsModal
+                    .classed('is-open', true)
+                    .style('left', xPos + 'px')
+                    .style('top', yPos + 'px');
+            }
+
+            d3.select('#newsModalClose').on('click', function() {
+                newsModal.classed('is-open', false);
+            });
+
+            d3.select(document).on('keydown.articleViewsNewsModal', function(event) {
+                if (event.key === 'Escape') {
+                    newsModal.classed('is-open', false);
+                }
+            });
+        }
+
+        function renderArticleTrafficSankey(rawTrafficData) {
+            const traffic = rawTrafficData || { months: [], rows: [] };
+            const months = Array.isArray(traffic.months) ? traffic.months : [];
+            const rows = Array.isArray(traffic.rows) ? traffic.rows : [];
+            const select = d3.select('#articleTrafficMonthSelect');
+            const status = d3.select('#articleTrafficStatus');
+
+            select.selectAll('option')
+                .data(months)
+                .join('option')
+                .attr('value', function(month) { return month; })
+                .text(function(month) { return month; });
+
+            if (months.length === 0) {
+                status.text('No Article Traffic month columns found.');
+                d3.select('#articleTrafficSankey').selectAll('*').remove();
+                return;
+            }
+
+            select.property('value', months[months.length - 1]);
+            select.on('change', function() {
+                drawArticleTrafficSankey(rows, this.value);
+            });
+
+            drawArticleTrafficSankey(rows, months[months.length - 1]);
+        }
+
+        function renderWealthHealthChart(rawData) {
+            const status = d3.select('#wealthHealthStatus');
+            const container = d3.select('#wealthHealthChart');
+            const parseDate = d3.timeParse('%Y-%m-%d');
+            const parseTimestamp = d3.timeParse('%Y-%m-%dT%H:%M:%S');
+            const formatDate = d3.timeFormat('%b %-d, %Y');
+            const formatStatusDate = d3.timeFormat('%b %d, %Y');
+            const dayMs = 24 * 60 * 60 * 1000;
+            const defaultWindowDays = 30;
+            let currentWindow = null;
+            let movingBrush = false;
+            const data = (rawData || [])
+                .map(function(d) {
+                    const rating = normalizeWealthHealthRating(d.rating);
+                    const size = Number(d.size);
+                    const timestamp = parseTimestamp(d.timestamp) || parseDate(d.date);
+
+                    return {
+                        date: timestamp,
+                        label: String(d.label || ''),
+                        url: String(d.url || ''),
+                        role: String(d.role || ''),
+                        rating: rating,
+                        size: isNaN(size) ? 0 : size,
+                        indexSize: Math.abs(size),
+                        radiusSize: Math.abs(Number(d.radiusSize || size) || 0),
+                        edits: Number(d.edits) || 1
+                    };
+                })
+                .filter(function(d) {
+                    return d.date instanceof Date && !isNaN(d.date.getTime()) && d.label;
+                })
+                .sort(function(a, b) {
+                    return a.date - b.date || a.label.localeCompare(b.label);
+                });
+
+            container.selectAll('*').remove();
+
+            if (data.length === 0) {
+                status.text('No Article Edits rows found.');
+                return;
+            }
+
+            const maxRadiusSize = d3.max(data, function(d) { return d.radiusSize; }) || 1;
+            const maxIndexSize = d3.max(data, function(d) { return d.indexSize; }) || 1;
+            const logMaxRadiusSize = Math.log1p(maxRadiusSize) || 1;
+            const logMaxIndexSize = Math.log1p(maxIndexSize) || 1;
+
+            data.forEach(function(d) {
+                d.time = d.date.getTime();
+                d.sizeScore = (Math.log1p(d.radiusSize) / logMaxRadiusSize) * 100;
+                d.indexScore = (Math.log1p(d.indexSize) / logMaxIndexSize) * 100;
+            });
+
+            status.text('Loading bubbles...');
+
+            const outerWidth = Math.max(760, container.node().clientWidth || 980);
+            const focusHeight = 500;
+            const contextHeight = 72;
+            const margin = { top: 18, right: 28, bottom: 58, left: 96 };
+            const contextMarginTop = focusHeight + 34;
+            const width = outerWidth - margin.left - margin.right;
+            const innerHeight = focusHeight - margin.top - margin.bottom;
+            const contextInnerHeight = contextHeight - 20;
+            const svg = container.append('svg')
+                .attr('viewBox', '0 0 ' + outerWidth + ' ' + (focusHeight + contextHeight + 12));
+            const body = svg.append('g')
+                .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+            const firstTime = d3.timeDay.floor(d3.min(data, function(d) { return d.date; })).getTime();
+            const lastTime = d3.timeDay.floor(d3.max(data, function(d) { return d.date; })).getTime();
+            const activityTimes = Array.from(new Set(data.map(function(d) { return d.time; }))).sort(function(a, b) { return a - b; });
+            const cuts = buildTimelineCuts(activityTimes);
+            const compressedLastTime = realToCompressed(lastTime);
+
+            data.forEach(function(d) {
+                d.compressedTime = realToCompressed(d.time);
+            });
+
+            const x = d3.scaleLinear()
+                .range([0, width]);
+            const xContext = d3.scaleLinear()
+                .domain([firstTime, compressedLastTime])
+                .range([0, width]);
+            const y = d3.scaleLinear()
+                .domain([0, 100])
+                .range([innerHeight, 0]);
+            const yContext = d3.scaleLinear()
+                .domain([0, 100])
+                .range([contextInnerHeight, 0]);
+            const radius = d3.scaleSqrt()
+                .domain([0, 100])
+                .range([5, 34]);
+
+            const grid = body.append('g')
+                .attr('class', 'grid');
+
+            const xAxis = body.append('g')
+                .attr('class', 'axis')
+                .attr('transform', 'translate(0,' + innerHeight + ')');
+
+            body.append('g')
+                .attr('class', 'axis')
+                .call(d3.axisLeft(y).ticks(6).tickFormat(formatLogNominalEditSize));
+
+            body.append('text')
+                .attr('x', -innerHeight / 2)
+                .attr('y', -62)
+                .attr('transform', 'rotate(-90)')
+                .attr('text-anchor', 'middle')
+                .attr('fill', '#4b5155')
+                .attr('font-size', 12)
+                .text('Edit Size (nominal charachters)');
+
+            const nodeLayer = body.append('g');
+            const cutLayer = body.append('g');
+            const context = svg.append('g')
+                .attr('transform', 'translate(' + margin.left + ',' + contextMarginTop + ')');
+
+            context.append('g')
+                .selectAll('circle')
+                .data(data)
+                .enter()
+                .append('circle')
+                .attr('cx', function(d) { return xContext(d.compressedTime); })
+                .attr('cy', function(d) { return yContext(d.indexScore); })
+                .attr('r', 2.4)
+                .attr('fill', function(d) { return wealthHealthColor(d.rating, d.role); })
+                .attr('opacity', 0.72);
+
+            context.append('g')
+                .attr('class', 'axis')
+                .attr('transform', 'translate(0,' + contextInnerHeight + ')')
+                .call(d3.axisBottom(xContext).ticks(8).tickFormat(function(value) {
+                    return d3.timeFormat('%b %-d')(new Date(compressedToReal(value)));
+                }));
+
+            const contextCuts = context.append('g')
+                .selectAll('g')
+                .data(cuts)
+                .enter()
+                .append('g')
+                .attr('class', 'timeline-jump')
+                .attr('transform', function(d) {
+                    return 'translate(' + xContext(d.compressedTime) + ',0)';
+                });
+
+            contextCuts.append('line')
+                .attr('y1', 0)
+                .attr('y2', contextInnerHeight);
+
+            contextCuts.append('text')
+                .attr('y', 14)
+                .text('~');
+
+            const brush = d3.brushX()
+                .extent([[0, 0], [width, contextInnerHeight]])
+                .on('brush end', brushed);
+
+            const brushLayer = context.append('g')
+                .attr('class', 'brush')
+                .call(brush);
+
+            const initialEnd = compressedLastTime;
+            const initialStart = Math.max(firstTime, compressedLastTime - defaultWindowDays * dayMs);
+            currentWindow = [initialStart, initialEnd];
+            updateWindow(currentWindow);
+            moveBrushToWindow(currentWindow);
+
+            function updateWindow(windowRange) {
+                const startTime = windowRange[0];
+                const endTime = windowRange[1];
+                const startDate = new Date(compressedToReal(startTime));
+                const endDate = new Date(compressedToReal(endTime));
+                const windowData = data.filter(function(d) {
+                    return d.compressedTime >= startTime && d.compressedTime <= endTime;
+                });
+
+                x.domain([startTime, endTime]);
+
+                const nodes = windowData.map(function(d) {
+                    return Object.assign({}, d, {
+                        x: x(d.compressedTime),
+                        y: y(d.indexScore),
+                        r: d.radiusSize > 0 ? radius(d.sizeScore) : 3
+                    });
+                });
+
+                updateStatus(windowData, startDate, endDate);
+
+                grid.call(d3.axisLeft(y).ticks(6).tickSize(-width).tickFormat(''));
+                xAxis
+                    .call(d3.axisBottom(x).tickValues(buildCompressedDateTicks(startTime, endTime, windowData)).tickFormat(function(value) {
+                        return d3.timeFormat('%b %-d')(new Date(compressedToReal(value)));
+                    }))
+                    .selectAll('text')
+                    .attr('text-anchor', 'end')
+                    .attr('dx', '-0.6em')
+                    .attr('dy', '0.2em')
+                    .attr('transform', 'rotate(-60)');
+
+                const visibleCuts = cuts.filter(function(cut) {
+                    return cut.compressedTime >= startTime && cut.compressedTime <= endTime;
+                });
+
+                const cut = cutLayer
+                    .selectAll('g')
+                    .data(visibleCuts, function(d) { return d.start + '|' + d.end; })
+                    .join(
+                        function(enter) {
+                            const group = enter.append('g')
+                                .attr('class', 'timeline-jump')
+                                .attr('opacity', 0);
+
+                            group.append('line')
+                                .attr('y1', 0)
+                                .attr('y2', innerHeight);
+
+                            group.append('text')
+                                .attr('y', 18)
+                                .text('~');
+
+                            return group;
+                        },
+                        function(update) { return update; },
+                        function(exit) { return exit.remove(); }
+                    );
+
+                cut.attr('opacity', 1)
+                    .attr('transform', function(d) {
+                        return 'translate(' + x(d.compressedTime) + ',0)';
+                    });
+
+                nodes.forEach(function(d) {
+                    d.x = x(d.compressedTime);
+                    d.y = y(d.indexScore);
+                });
+
+                const node = nodeLayer
+                    .selectAll('g')
+                    .data(nodes, function(d) {
+                        return d.date.getTime() + '|' + d.label;
+                    })
+                    .join(
+                        function(enter) {
+                            const group = enter.append('g')
+                                .attr('transform', function(d) {
+                                    return 'translate(' +
+                                        Math.max(d.r, Math.min(width - d.r, d.x)) +
+                                        ',' +
+                                        Math.max(d.r, Math.min(innerHeight - d.r, d.y)) +
+                                        ')';
+                                })
+                                .attr('opacity', 0);
+
+                            group.append('circle')
+                                .attr('class', 'wealth-bubble')
+                                .attr('r', 0)
+                                .attr('fill', function(d) { return wealthHealthColor(d.rating, d.role); });
+
+                            group.append('text')
+                                .attr('class', 'wealth-bubble-label')
+                                .attr('dy', '0.32em')
+                                .attr('opacity', 0)
+                                .text(function(d) { return d.label; });
+
+                            group.append('title');
+
+                            return group;
+                        },
+                        function(update) {
+                            return update;
+                        },
+                        function(exit) {
+                            return exit.remove();
+                        }
+                    );
+
+                node.select('circle')
+                    .attr('fill', function(d) { return wealthHealthColor(d.rating, d.role); });
+
+                node.select('circle')
+                    .attr('r', function(d) { return d.r; });
+
+                node.select('text')
+                    .text(function(d) { return d.label; });
+
+                node.select('text')
+                    .classed('is-linked', function(d) { return !!d.url; })
+                    .on('click', function(event, d) {
+                        if (!d.url) {
+                            return;
+                        }
+
+                        event.stopPropagation();
+                        window.open(d.url, '_blank', 'noopener');
+                    })
+                    .on('keydown', function(event, d) {
+                        if (!d.url || (event.key !== 'Enter' && event.key !== ' ')) {
+                            return;
+                        }
+
+                        event.preventDefault();
+                        window.open(d.url, '_blank', 'noopener');
+                    })
+                    .attr('tabindex', function(d) { return d.url ? 0 : null; });
+
+                node.select('text')
+                    .attr('opacity', 1);
+
+                node.select('title')
+                    .text(function(d) {
+                        return d.label +
+                            '\n' +
+                            formatDate(d.date) +
+                            '\n' +
+                            'Rating: ' + capitalizeFirst(d.rating) +
+                            '\n' +
+                            'Size: ' + d.size.toLocaleString() +
+                            '\n' +
+                            'Bubble size: ' + d.radiusSize.toLocaleString() +
+                            '\n' +
+                            'Log nominal scale: ' + Math.round(d.indexScore) +
+                            '\n' +
+                            'Edits: ' + d.edits.toLocaleString() +
+                            (d.role ? '\nRole: ' + d.role : '') +
+                            (d.url ? '\nClick label to open diff' : '');
+                    });
+
+                node.attr('opacity', 1)
+                    .attr('transform', function(d) {
+                        return 'translate(' +
+                            Math.max(d.r, Math.min(width - d.r, d.x)) +
+                            ',' +
+                            Math.max(d.r, Math.min(innerHeight - d.r, d.y)) +
+                            ')';
+                    });
+            }
+
+            function updateStatus(windowData, fallbackStartDate, fallbackEndDate) {
+                const edits = d3.sum(windowData, function(d) { return d.edits; });
+                const earliest = d3.min(windowData, function(d) { return d.date; }) || fallbackStartDate;
+                const latest = d3.max(windowData, function(d) { return d.date; }) || fallbackEndDate;
+
+                status.text(
+                    edits.toLocaleString() +
+                    ' edits | ' +
+                    formatStatusDate(earliest) +
+                    ' - ' +
+                    formatStatusDate(latest)
+                );
+            }
+
+            function formatLogNominalEditSize(score) {
+                const nominal = Math.round(Math.expm1((Number(score) || 0) / 100 * logMaxIndexSize));
+
+                return nominal.toLocaleString();
+            }
+
+            function brushed(event) {
+                if (movingBrush) {
+                    return;
+                }
+
+                const selection = event.selection;
+
+                if (!selection) {
+                    return;
+                }
+
+                const start = Math.max(firstTime, Math.min(compressedLastTime, xContext.invert(selection[0])));
+                const end = Math.max(firstTime, Math.min(compressedLastTime, xContext.invert(selection[1])));
+                currentWindow = [Math.min(start, end), Math.max(start, end)];
+                updateWindow(currentWindow);
+            }
+
+            function moveBrushToWindow(windowRange) {
+                movingBrush = true;
+                brushLayer.call(brush.move, windowRange.map(xContext));
+                movingBrush = false;
+            }
+
+            function buildTimelineCuts(times) {
+                const result = [];
+                let removed = 0;
+
+                for (let i = 1; i < times.length; i++) {
+                    const previous = times[i - 1];
+                    const next = times[i];
+                    const start = previous + dayMs;
+                    const end = next - dayMs;
+
+                    if (end <= start) {
+                        continue;
+                    }
+
+                    const duration = end - start;
+
+                    result.push({
+                        start: start,
+                        end: end,
+                        duration: duration,
+                        compressedTime: start - removed
+                    });
+
+                    removed += duration;
+                }
+
+                return result;
+            }
+
+            function realToCompressed(time) {
+                let compressed = time;
+
+                cuts.forEach(function(cut) {
+                    if (time >= cut.end) {
+                        compressed -= cut.duration;
+                    } else if (time > cut.start) {
+                        compressed -= time - cut.start;
+                    }
+                });
+
+                return compressed;
+            }
+
+            function compressedToReal(time) {
+                let real = time;
+
+                cuts.forEach(function(cut) {
+                    if (real >= cut.compressedTime) {
+                        real += cut.duration;
+                    }
+                });
+
+                return real;
+            }
+
+            function buildCompressedDateTicks(startTime, endTime, windowData) {
+                const ticks = [startTime, endTime];
+                const clusters = {};
+
+                (windowData || []).forEach(function(d) {
+                    const day = d3.timeDay.floor(d.date);
+                    const dayKey = d3.timeFormat('%Y-%m-%d')(day);
+                    const realTime = d.time;
+
+                    if (isInsideTimelineCut(realTime)) {
+                        return;
+                    }
+
+                    if (!clusters[dayKey]) {
+                        clusters[dayKey] = [];
+                    }
+
+                    clusters[dayKey].push(d.compressedTime);
+                });
+
+                Object.keys(clusters).forEach(function(dayKey) {
+                    const values = clusters[dayKey]
+                        .filter(function(value) {
+                            return value >= startTime && value <= endTime;
+                        })
+                        .sort(function(a, b) { return a - b; });
+
+                    if (values.length === 0) {
+                        return;
+                    }
+
+                    if (values.length === 1) {
+                        ticks.push(values[0]);
+                        return;
+                    }
+
+                    ticks.push(
+                        values[0],
+                        values[Math.floor(values.length / 2)],
+                        values[values.length - 1]
+                    );
+                });
+
+                return ticks
+                    .sort(function(a, b) { return a - b; })
+                    .filter(function(value, index, values) {
+                        if (value < startTime || value > endTime) {
+                            return false;
+                        }
+
+                        if (value === startTime) {
+                            return true;
+                        }
+
+                        if (isInsideTimelineCut(compressedToReal(value))) {
+                            return false;
+                        }
+
+                        if (index === 0) {
+                            return true;
+                        }
+
+                        return Math.abs(value - values[index - 1]) >= 60 * 60 * 1000;
+                    });
+            }
+
+            function isInsideTimelineCut(realTime) {
+                return cuts.some(function(cut) {
+                    return realTime > cut.start && realTime < cut.end;
+                });
+            }
+        }
+
+        function normalizeWealthHealthRating(value) {
+            const rating = String(value || '').trim().toLowerCase();
+
+            if (['adversarial', 'foe', 'neutral', 'friend', 'trusted'].indexOf(rating) !== -1) {
+                return rating;
+            }
+
+            return 'unknown';
+        }
+
+        function wealthHealthColor(rating, role) {
+            const normalizedRating = normalizeWealthHealthRating(rating);
+            const privileged = /^(bot|admin|administrator)$/i.test(String(role || '').trim());
+
+            if (privileged && normalizedRating === 'neutral') {
+                return '#9ecbff';
+            }
+
+            if (normalizedRating === 'adversarial') {
+                return privileged ? '#8f160f' : 'rgb(217, 48, 37)';
+            }
+
+            if (normalizedRating === 'foe') {
+                return privileged ? 'rgb(217, 48, 37)' : 'rgba(217, 48, 37, 0.58)';
+            }
+
+            if (normalizedRating === 'friend') {
+                return privileged ? 'rgb(24, 128, 56)' : 'rgba(24, 128, 56, 0.58)';
+            }
+
+            if (normalizedRating === 'trusted') {
+                return privileged ? '#063f16' : 'rgb(24, 128, 56)';
+            }
+
+            if (normalizedRating === 'neutral') {
+                return '#fff2a8';
+            }
+
+            return '#d9dde2';
+        }
+
+        function capitalizeFirst(value) {
+            const text = String(value || '').trim();
+
+            if (!text) {
+                return '';
+            }
+
+            return text.charAt(0).toUpperCase() + text.slice(1);
+        }
+
+        function drawArticleTrafficSankey(rows, month) {
+            const container = d3.select('#articleTrafficSankey');
+            const status = d3.select('#articleTrafficStatus');
+            const centerName = 'Melissa DeRosa';
+            const outerWidth = Math.max(760, container.node().clientWidth || 980);
+            const height = 520;
+            const margin = { top: 12, right: 22, bottom: 18, left: 22 };
+            const width = outerWidth - margin.left - margin.right;
+            const graph = buildArticleTrafficSankeyGraph(rows, month, centerName);
+
+            container.selectAll('*').remove();
+
+            if (graph.links.length === 0) {
+                status.text('No traffic values for ' + formatArticleTrafficMonth(month) + '.');
+                return;
+            }
+
+            status.text(
+                formatArticleTrafficMonth(month) +
+                ' | ' +
+                graph.incomingCount +
+                ' incoming | ' +
+                graph.outgoingCount +
+                ' outgoing'
+            );
+
+            const svg = container.append('svg')
+                .attr('viewBox', '0 0 ' + outerWidth + ' ' + height);
+            const body = svg.append('g')
+                .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+            const sankey = d3.sankey()
+                .nodeId(function(d) { return d.id; })
+                .nodeWidth(16)
+                .nodePadding(12)
+                .nodeAlign(d3.sankeyCenter)
+                .extent([[0, 0], [width, height - margin.top - margin.bottom]]);
+            const layout = sankey({
+                nodes: graph.nodes.map(function(node) { return Object.assign({}, node); }),
+                links: graph.links.map(function(link) { return Object.assign({}, link); })
+            });
+
+            const link = body.append('g')
+                .attr('fill', 'none')
+                .selectAll('path')
+                .data(layout.links)
+                .join('path')
+                .attr('class', 'sankey-link')
+                .attr('d', d3.sankeyLinkHorizontal())
+                .attr('stroke', function(d) {
+                    return articleTrafficFlowColor(d, 0.58);
+                })
+                .attr('stroke-width', function(d) { return Math.max(1, d.width); })
+                .attr('stroke-opacity', 0.72);
+
+            link
+                .append('title')
+                .text(function(d) {
+                    return d.source.name + ' -> ' + d.target.name + '\n' + d.value.toLocaleString();
+                });
+
+            const node = body.append('g')
+                .selectAll('g')
+                .data(layout.nodes)
+                .join('g')
+                .attr('class', function(d) {
+                    return d.url ? 'sankey-node-group is-linked' : 'sankey-node-group';
+                })
+                .on('click', function(event, d) {
+                    if (!d.url) {
+                        return;
+                    }
+
+                    event.stopPropagation();
+                    window.open(d.url, '_blank', 'noopener');
+                });
+
+            node.append('rect')
+                .attr('class', 'sankey-node')
+                .attr('x', function(d) { return d.x0; })
+                .attr('y', function(d) { return d.y0; })
+                .attr('height', function(d) { return Math.max(1, d.y1 - d.y0); })
+                .attr('width', function(d) { return d.x1 - d.x0; })
+                .attr('rx', 2)
+                .attr('fill', function(d) {
+                    return d.id === centerName
+                        ? '#30363a'
+                        : articleTrafficNodeColor(d, 1);
+                })
+                .append('title')
+                .text(function(d) {
+                    return d.name +
+                        '\n' +
+                        d.value.toLocaleString() +
+                        (d.url ? '\nClick to open' : '');
+                });
+
+            node.append('text')
+                .attr('class', 'sankey-node-label')
+                .attr('x', function(d) {
+                    if (d.id === centerName) {
+                        return (d.x0 + d.x1) / 2;
+                    }
+
+                    return d.x0 < width / 2 ? d.x1 + 7 : d.x0 - 7;
+                })
+                .attr('y', function(d) { return (d.y0 + d.y1) / 2; })
+                .attr('dy', '0.35em')
+                .attr('text-anchor', function(d) {
+                    if (d.id === centerName) {
+                        return 'middle';
+                    }
+
+                    return d.x0 < width / 2 ? 'start' : 'end';
+                })
+                .text(function(d) {
+                    return articleTrafficNodeLabel(d, graph.centerInputTotal, centerName);
+                });
+        }
+
+        function buildArticleTrafficSankeyGraph(rows, month, centerName) {
+            const centerId = centerName;
+            const nodeMap = new Map();
+            const linkMap = new Map();
+            let centerInputTotal = 0;
+            let incomingCount = 0;
+            let outgoingCount = 0;
+
+            nodeMap.set(centerId, {
+                id: centerId,
+                name: centerName,
+                sentiment: 'neutral',
+                url: 'https://en.wikipedia.org/wiki/Melissa_DeRosa'
+            });
+
+            (rows || []).forEach(function(row) {
+                const label = String(row.label || '').trim();
+                const direction = String(row.direction || '').trim().toLowerCase();
+                const sentiment = normalizeArticleTrafficSentiment(row.sentiment);
+                const value = Number(row.values && row.values[month]) || 0;
+
+                if (!label || value <= 0 || (direction !== 'in' && direction !== 'out')) {
+                    return;
+                }
+
+                const nodeId = direction + '|' + sentiment + '|' + label;
+
+                if (!nodeMap.has(nodeId)) {
+                    nodeMap.set(nodeId, {
+                        id: nodeId,
+                        name: label,
+                        sentiment: sentiment,
+                        url: String(row.url || '').trim()
+                    });
+                }
+
+                const source = direction === 'in' ? nodeId : centerId;
+                const target = direction === 'in' ? centerId : nodeId;
+                const linkId = source + '->' + target + '|' + sentiment;
+                const existing = linkMap.get(linkId);
+
+                if (direction === 'in') {
+                    centerInputTotal += value;
+                }
+
+                if (existing) {
+                    existing.value += value;
+                    return;
+                }
+
+                if (direction === 'in') {
+                    incomingCount++;
+                } else {
+                    outgoingCount++;
+                }
+
+                linkMap.set(linkId, {
+                    source: source,
+                    target: target,
+                    value: value,
+                    sentiment: sentiment
+                });
+            });
+
+            return {
+                nodes: Array.from(nodeMap.values()),
+                links: Array.from(linkMap.values()),
+                centerInputTotal: centerInputTotal,
+                incomingCount: incomingCount,
+                outgoingCount: outgoingCount
+            };
+        }
+
+        function formatArticleTrafficMonth(month) {
+            const match = String(month || '').match(/^(\d{4})-(\d{2})$/);
+
+            if (!match) {
+                return String(month || '');
+            }
+
+            const date = new Date(Number(match[1]), Number(match[2]) - 1, 1);
+            return d3.timeFormat('%b %Y')(date);
+        }
+
+        function articleTrafficNodeLabel(node, centerInputTotal, centerName) {
+            const value = node.id === centerName
+                ? centerInputTotal
+                : Number(node.value) || 0;
+            const percent = centerInputTotal > 0
+                ? Math.round((value / centerInputTotal) * 100)
+                : 0;
+
+            return node.name + ' (' + value.toLocaleString() + '/' + percent + '%)';
+        }
+
+        function normalizeArticleTrafficSentiment(value) {
+            const sentiment = String(value || '').trim().toLowerCase();
+
+            if (sentiment === 'negative') {
+                return 'negative';
+            }
+
+            if (sentiment === 'positive') {
+                return 'positive';
+            }
+
+            return 'neutral';
+        }
+
+        function articleTrafficSentimentColor(sentiment, opacity) {
+            const alpha = opacity === undefined ? 1 : opacity;
+            const value = normalizeArticleTrafficSentiment(sentiment);
+
+            if (value === 'negative') {
+                return alpha === 1 ? '#d93025' : 'rgba(217, 48, 37, ' + alpha + ')';
+            }
+
+            if (value === 'positive') {
+                return alpha === 1 ? '#188038' : 'rgba(24, 128, 56, ' + alpha + ')';
+            }
+
+            return alpha === 1 ? '#d9dde2' : 'rgba(217, 221, 226, ' + alpha + ')';
+        }
+
+        function articleTrafficNodeColor(node, opacity) {
+            return articleTrafficCategoryColor(node && node.name, opacity) ||
+                articleTrafficSentimentColor(node && node.sentiment, opacity);
+        }
+
+        function articleTrafficFlowColor(link, opacity) {
+            return articleTrafficCategoryColor(link && link.source && link.source.name, opacity) ||
+                articleTrafficCategoryColor(link && link.target && link.target.name, opacity) ||
+                articleTrafficSentimentColor(link && link.sentiment, opacity);
+        }
+
+        function articleTrafficCategoryColor(label, opacity) {
+            const alpha = opacity === undefined ? 1 : opacity;
+            const value = String(label || '').trim().toLowerCase();
+
+            if (value === 'search engines') {
+                return alpha === 1 ? '#9ecbff' : 'rgba(158, 203, 255, ' + alpha + ')';
+            }
+
+            if (value === 'other wikimedia' || value === 'wikimedia traffic' || value === 'other wikimedia projects') {
+                return alpha === 1 ? '#d8c7ff' : 'rgba(216, 199, 255, ' + alpha + ')';
+            }
+
+            if (value === 'websites' || value === 'other websites') {
+                return alpha === 1 ? '#ffe8a3' : 'rgba(255, 232, 163, ' + alpha + ')';
+            }
+
+            return '';
+        }
+
+    </script>
+</body>
+</html>
