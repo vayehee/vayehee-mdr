@@ -25,6 +25,37 @@
             color: var(--text);
         }
 
+        .landing {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .landing-card {
+            width: min(520px, 100%);
+            background: #fff;
+            border: 1px solid #dde1e5;
+            border-radius: 8px;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .landing-card h1 {
+            margin-bottom: 10px;
+        }
+
+        .landing-info {
+            color: var(--muted);
+            font-size: 14px;
+            min-height: 20px;
+        }
+
+        .is-hidden {
+            display: none;
+        }
+
         main {
             max-width: 1180px;
             margin: 0 auto;
@@ -277,7 +308,13 @@
     </style>
 </head>
 <body>
-    <main>
+    <section class="landing" id="landing">
+        <div class="landing-card">
+            <h1>Vayehee CKG/GenAI Monitor</h1>
+            <div class="landing-info" id="landingInfo">Authenticating request...</div>
+        </div>
+    </section>
+    <main id="dashboard" class="is-hidden">
         <section class="chart-panel">
             <div class="chart-head">
                 <h1>Melissa DeRosa Interest Pulse</h1>
@@ -335,7 +372,11 @@
             const message = event && event.message
                 ? event.message
                 : 'Dashboard script error.';
-            document.getElementById('status').textContent = message;
+            const landingInfo = document.getElementById('landingInfo');
+
+            if (landingInfo) {
+                landingInfo.textContent = message;
+            }
         });
 
         if (document.readyState === 'loading') {
@@ -345,47 +386,45 @@
         }
 
         function bootDashboard() {
-            const status = document.getElementById('status');
+            const landingInfo = document.getElementById('landingInfo');
             const webApp = initTelegramWebApp();
 
             if (!loadDashboardData(webApp)) {
                 return;
             }
 
-            status.textContent = 'Loading D3...';
-
             const startedAt = Date.now();
             const timer = setInterval(function() {
                 if (window.DASHBOARD_AUTH_ERROR) {
                     clearInterval(timer);
-                    status.textContent = window.DASHBOARD_AUTH_ERROR;
+                    landingInfo.textContent = 'Unauthorized access!';
                     return;
                 }
 
                 if (window.d3 && window.d3.sankey && window.ARTICLE_VIEWS_DATA_READY) {
                     clearInterval(timer);
-                    status.textContent = 'Rendering chart...';
                     renderArticleViewsChart(window.ARTICLE_VIEWS_DATA || [], window.GOOGLE_NEWS_DATA || []);
                     renderArticleTrafficSankey(window.ARTICLE_TRAFFIC_DATA || { months: [], rows: [] });
                     renderWealthHealthChart(window.WEALTH_HEALTH_DATA || []);
+                    showDashboard();
                     return;
                 }
 
                 if (Date.now() - startedAt > 8000) {
                     clearInterval(timer);
                     if (!window.d3) {
-                        status.textContent = 'D3 library did not load.';
+                        landingInfo.textContent = 'Dashboard library did not load.';
                         return;
                     }
                     if (!window.d3.sankey) {
-                        status.textContent = 'D3 Sankey library did not load.';
+                        landingInfo.textContent = 'Dashboard library did not load.';
                         return;
                     }
                     if (!window.ARTICLE_VIEWS_DATA_READY) {
-                        status.textContent = 'Dashboard data did not load.';
+                        landingInfo.textContent = 'Dashboard data did not load.';
                         return;
                     }
-                    status.textContent = 'Dashboard could not start.';
+                    landingInfo.textContent = 'Dashboard could not start.';
                 }
             }, 100);
         }
@@ -404,12 +443,14 @@
         }
 
         function loadDashboardData(webApp) {
-            const status = document.getElementById('status');
+            const landingInfo = document.getElementById('landingInfo');
 
             if (!webApp || !webApp.initData) {
-                status.textContent = 'Open this dashboard from the Telegram group.';
+                landingInfo.textContent = 'Unauthorized access!';
                 return false;
             }
+
+            landingInfo.textContent = 'Requesting data...';
 
             const script = document.createElement('script');
             script.defer = true;
@@ -418,20 +459,16 @@
                 '&now=' +
                 Date.now();
             script.onerror = function() {
-                const unsafe = webApp.initDataUnsafe || {};
-                const chat = unsafe.chat || {};
-
-                status.textContent = 'Dashboard data could not be loaded. ' +
-                    '[initDataLength=' + String(webApp.initData || '').length +
-                    ', chat_type=' + String(unsafe.chat_type || '') +
-                    ', chat_id=' + String(chat.id || '') +
-                    ', chat_instance=' + String(unsafe.chat_instance || '') +
-                    ', platform=' + String(webApp.platform || '') +
-                    ']';
+                landingInfo.textContent = 'Dashboard data did not load.';
             };
 
             document.head.appendChild(script);
             return true;
+        }
+
+        function showDashboard() {
+            document.getElementById('landing').classList.add('is-hidden');
+            document.getElementById('dashboard').classList.remove('is-hidden');
         }
 
         function renderArticleViewsChart(rawData, rawNewsData) {
