@@ -418,7 +418,16 @@
                 '&now=' +
                 Date.now();
             script.onerror = function() {
-                status.textContent = 'Dashboard data could not be loaded.';
+                const unsafe = webApp.initDataUnsafe || {};
+                const chat = unsafe.chat || {};
+
+                status.textContent = 'Dashboard data could not be loaded. ' +
+                    '[initDataLength=' + String(webApp.initData || '').length +
+                    ', chat_type=' + String(unsafe.chat_type || '') +
+                    ', chat_id=' + String(chat.id || '') +
+                    ', chat_instance=' + String(unsafe.chat_instance || '') +
+                    ', platform=' + String(webApp.platform || '') +
+                    ']';
             };
 
             document.head.appendChild(script);
